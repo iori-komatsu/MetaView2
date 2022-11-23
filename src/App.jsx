@@ -4,6 +4,21 @@ import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import "./App.css";
 
+function MetadataList({ metadata }) {
+  const metadataItems = metadata.map(([name, value], index) =>
+    <React.Fragment key={index}>
+      <dt>{name}</dt>
+      <dd>{value}</dd>
+    </React.Fragment>
+  );
+
+  return (
+    <dl className="image-metadata">
+      {metadataItems}
+    </dl>
+  );
+}
+
 function ImageCard({ image, focusOn }) {
   const el = useRef(null);
   useEffect(() => {
@@ -16,13 +31,6 @@ function ImageCard({ image, focusOn }) {
     invoke("remove_image", { id: image.id }).catch(console.error);
   }
 
-  const metadataItems = image.metadata.map((kv, index) =>
-    <React.Fragment key={index}>
-      <dt>{kv[0]}</dt>
-      <dd>{kv[1]}</dd>
-    </React.Fragment>
-  );
-
   return (
     <div className="card mb-3" ref={el}>
       <div className="row g-0">
@@ -32,7 +40,7 @@ function ImageCard({ image, focusOn }) {
         <div className="col-md-8 position-relative">
           <button type="button" className="btn-close position-absolute top-0 end-0" aria-label="Close" onClick={handleCloseButtonClick}></button>
           <div className="card-body">
-            {metadataItems}
+            <MetadataList metadata={image.metadata} />
             <p className="card-text"><small className="text-muted">{image.filename}</small></p>
           </div>
         </div>
@@ -48,7 +56,7 @@ function App() {
   useEffect(() => {
     console.log("Listen file-drop");
     const unlisten = listen("tauri://file-drop", event => {
-      if (event.payload.length == 0) {
+      if (event.payload.length === 0) {
         return;
       }
       const filename = event.payload[0];
@@ -90,13 +98,9 @@ function App() {
     );
   }
 
-  const imageCards = images.map(image => {
-    return (
-      <React.Fragment key={image.id}>
-        <ImageCard image={image} focusOn={image.id == focusOn} />
-      </React.Fragment>
-    );
-  })
+  const imageCards = images.map(image =>
+    <ImageCard image={image} focusOn={image.id === focusOn} key={image.id} />
+  )
 
   return (
     <div className="container-fluid" style={{padding: "8px"}}>

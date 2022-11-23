@@ -12,28 +12,31 @@ use std::{
         Mutex,
     },
 };
-use tauri::{Manager};
+use tauri::Manager;
 
 fn read_png_metadata(filename: &str) -> anyhow::Result<Vec<(String, String)>> {
     let f = File::open(filename)?;
     let decoder = png::Decoder::new(f);
-    let reader = decoder.read_info().map_err(|e| {
-        match e {
-            DecodingError::Format(_) => {
-                anyhow::anyhow!("Not a PNG file: {}", filename)
-            }
-            _ => {
-                anyhow::anyhow!("Failed to open PNG: {}", e)
-            }
+    let reader = decoder.read_info().map_err(|e| match e {
+        DecodingError::Format(_) => {
+            anyhow::anyhow!("Not a PNG file: {}", filename)
+        }
+        _ => {
+            anyhow::anyhow!("Failed to open PNG: {}", e)
         }
     })?;
     let info = reader.info();
-    let ret = info
+    let latin1_data = info
         .uncompressed_latin1_text
         .iter()
-        .map(|chunk| (chunk.keyword.clone(), chunk.text.clone()))
-        .collect();
-    Ok(ret)
+        .map(|chunk| (chunk.keyword.clone(), chunk.text.clone()));
+    let utf8_data = info.utf8_text.iter().map(|chunk| {
+        (
+            chunk.keyword.clone(),
+            chunk.get_text().unwrap_or("".to_owned()),
+        )
+    });
+    Ok(latin1_data.chain(utf8_data).collect())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,10 +69,7 @@ struct StateChangedPayload {
     focus_on: u32,
 }
 
-fn emit_state_changed(
-    state: tauri::State<'_, State>,
-    app_handle: tauri::AppHandle,
-) {
+fn emit_state_changed(state: tauri::State<'_, State>, app_handle: tauri::AppHandle) {
     let images = state.images.lock().unwrap();
     app_handle
         .emit_all(
